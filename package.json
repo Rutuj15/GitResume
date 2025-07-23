@@ -1,0 +1,100 @@
+{
+    "name": "gitresume",
+    "displayName": "GitResume",
+    "description": "Generate resume bullet points from Git contributions",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "keywords": [
+        "git",
+        "resume",
+        "ai",
+        "career",
+        "contributions"
+    ],
+    "activationEvents": [],
+    "main": "./dist/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "gitresume.generate",
+                "title": "Generate Resume Points",
+                "category": "GitResume"
+            },
+            {
+                "command": "gitresume.configure",
+                "title": "Configure API Key",
+                "category": "GitResume"
+            }
+        ],
+        "configuration": {
+            "title": "GitResume",
+            "properties": {
+                "gitresume.openaiApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OpenAI API Key",
+                    "scope": "application"
+                },
+                "gitresume.model": {
+                    "type": "string",
+                    "default": "gpt-4o-mini",
+                    "enum": [
+                        "gpt-4o-mini"
+                    ],
+                    "description": "AI model to use"
+                },
+                "gitresume.maxBullets": {
+                    "type": "number",
+                    "default": 10,
+                    "description": "Maximum bullets to generate"
+                },
+                "gitresume.style": {
+                    "type": "string",
+                    "default": "professional",
+                    "enum": [
+                        "professional",
+                        "technical",
+                        "startup",
+                        "academic"
+                    ],
+                    "description": "Writing style"
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src --ext ts",
+        "test": "node ./out/test/runTest.js"
+    },
+    "devDependencies": {
+        "@types/minimatch": "^5.1.2",
+        "@types/mocha": "^10.0.3",
+        "@types/node": "18.x",
+        "@types/vscode": "^1.85.0",
+        "@typescript-eslint/eslint-plugin": "^6.9.0",
+        "@typescript-eslint/parser": "^6.9.0",
+        "@vscode/test-cli": "^0.0.4",
+        "@vscode/test-electron": "^2.3.6",
+        "eslint": "^8.52.0",
+        "glob": "^10.3.10",
+        "mocha": "^10.2.0",
+        "ts-loader": "^9.5.2",
+        "typescript": "^5.2.2",
+        "webpack": "^5.100.2",
+        "webpack-cli": "^5.1.4"
+    },
+    "dependencies": {
+        "minimatch": "^9.0.3",
+        "openai": "^4.24.1",
+        "simple-git": "^3.22.0"
+    }
+}
