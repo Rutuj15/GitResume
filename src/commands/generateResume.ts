@@ -62,17 +62,10 @@ export async function generateResume(context: vscode.ExtensionContext) {
             // Step 1: Analyze repository
             progress.report({ message: 'Analyzing Git history...', increment: 20 });
             
-            const commits = await gitAnalyzer.getUserCommits(userEmail);
-            if (commits.length === 0) {
-                vscode.window.showWarningMessage('No commits found for this email');
-                return;
-            }
-
             // Step 2: Extract code snippets
             progress.report({ message: 'Extracting code changes...', increment: 30 });
             
             const snippets = await gitAnalyzer.extractCodeSnippets(
-                userEmail,
                 config.get<string[]>('includePatterns') || ['**/*.{js,ts,py,java,go}'],
                 config.get<string[]>('excludePatterns') || ['**/node_modules/**']
             );

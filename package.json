@@ -17,7 +17,7 @@
         "contributions"
     ],
     "activationEvents": [],
-    "main": "./dist/extension.js",
+    "main": "./out/extension.js",
     "contributes": {
         "commands": [
             {
@@ -93,6 +93,7 @@
         "webpack-cli": "^5.1.4"
     },
     "dependencies": {
+        "@google/generative-ai": "^0.24.1",
         "minimatch": "^9.0.3",
         "openai": "^4.24.1",
         "simple-git": "^3.22.0"

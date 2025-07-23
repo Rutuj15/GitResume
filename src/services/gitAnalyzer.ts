@@ -1,14 +1,7 @@
 import * as simpleGit from 'simple-git';
 import { minimatch } from 'minimatch';
 import * as path from 'path';
-
-export interface GitCommit {
-    hash: string;
-    message: string;
-    author: string;
-    email: string;
-    date: Date;
-}
+import * as fs from 'fs';
 
 export interface CodeSnippet {
     content: string;
@@ -35,68 +28,47 @@ export class GitAnalyzer {
         }
     }
 
-    async getUserCommits(email: string, limit: number = 100): Promise<GitCommit[]> {
-        const log = await this.git.log({
-            '--author': email,
-            '--max-count': limit
-        });
-
-        return log.all.map(commit => ({
-            hash: commit.hash,
-            message: commit.message,
-            author: commit.author_name,
-            email: commit.author_email,
-            date: new Date(commit.date)
-        }));
-    }
-
     async extractCodeSnippets(
-        email: string,
         includePatterns: string[],
         excludePatterns: string[]
     ): Promise<CodeSnippet[]> {
-        const commits = await this.getUserCommits(email, 50);
         const snippets: CodeSnippet[] = [];
-        const processedFiles = new Set<string>();
+        
+        // Get latest commit message for context
+        const latestCommit = await this.git.log({ maxCount: 1 });
+        const commitMessage = latestCommit.latest?.message || 'Current codebase';
 
-        for (const commit of commits) {
+        // Get all tracked files
+        const trackedFiles = await this.git.raw(['ls-files']);
+        const fileList = trackedFiles.trim().split('\n').filter(Boolean);
+
+        for (const filePath of fileList) {
+            // Skip if doesn't match patterns
+            if (!this.shouldIncludeFile(filePath, includePatterns, excludePatterns)) continue;
+            
             try {
-                // Get changed files in commit
-                const diff = await this.git.diffSummary([`${commit.hash}^`, commit.hash]);
+                // Read current file content
+                const fullPath = path.join(this.repoPath, filePath);
+                const content = fs.readFileSync(fullPath, 'utf8');
                 
-                for (const file of diff.files) {
-                    // Skip if already processed or doesn't match patterns
-                    if (processedFiles.has(file.file)) continue;
-                    if (!this.shouldIncludeFile(file.file, includePatterns, excludePatterns)) continue;
-                    
-                    processedFiles.add(file.file);
-
-                    // Get file content at this commit
-                    try {
-                        const content = await this.git.show([`${commit.hash}:${file.file}`]);
-                        
-                        // Limit content size
-                        const snippet = content.substring(0, 1000);
-                        
-                        snippets.push({
-                            content: snippet,
-                            filePath: file.file,
-                            language: this.detectLanguage(file.file),
-                            commitMessage: commit.message,
-                            additions: 'insertions' in file ? (file as simpleGit.DiffResultTextFile).insertions : 0,
-                            deletions: 'deletions' in file ? (file as simpleGit.DiffResultTextFile).deletions : 0
-                        });
-                    } catch {
-                        // File might not exist at this commit
-                        continue;
-                    }
-                }
+                // Limit content size for AI processing
+                const snippet = content.substring(0, 2000);
+                
+                snippets.push({
+                    content: snippet,
+                    filePath: filePath,
+                    language: this.detectLanguage(filePath),
+                    commitMessage: commitMessage,
+                    additions: 0, // Not applicable for current state
+                    deletions: 0  // Not applicable for current state
+                });
             } catch (error) {
-                console.error(`Error processing commit ${commit.hash}:`, error);
+                console.warn(`Could not read file ${filePath}:`, error);
+                continue;
             }
         }
 
-        return snippets.slice(0, 20); // Limit total snippets
+        return snippets.slice(0, 10); // Limit to top 10 files
     }
 
     private shouldIncludeFile(
@@ -137,7 +109,12 @@ export class GitAnalyzer {
             '.php': 'php',
             '.swift': 'swift',
             '.kt': 'kotlin',
-            '.scala': 'scala'
+            '.scala': 'scala',
+            '.html': 'html',
+            '.css': 'css',
+            '.scss': 'scss',
+            '.jsx': 'javascript',
+            '.tsx': 'typescript'
         };
         return langMap[ext] || 'text';
     }

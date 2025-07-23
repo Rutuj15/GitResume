@@ -13,9 +13,7 @@ export async function configureApiKey() {
             if (!value) {
                 return 'API key is required';
             }
-            if (!value.startsWith('sk-')) {
-                return 'Invalid API key format';
-            }
+
             return null;
         }
     });

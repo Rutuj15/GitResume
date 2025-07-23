@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { CodeSnippet } from './gitAnalyzer';
 
 export interface ResumeBullet {
@@ -8,10 +8,14 @@ export interface ResumeBullet {
 }
 
 export class ResumeGenerator {
-    private openai: OpenAI;
+    private genAI: GoogleGenerativeAI;
+    private model: any;
 
     constructor(apiKey: string) {
-        this.openai = new OpenAI({ apiKey });
+        this.genAI = new GoogleGenerativeAI(apiKey);
+        this.model = this.genAI.getGenerativeModel({ 
+            model: 'gemini-2.0-flash'
+        });
     }
 
     async generateBullets(
@@ -21,24 +25,54 @@ export class ResumeGenerator {
     ): Promise<ResumeBullet[]> {
         const systemPrompt = this.buildSystemPrompt(style);
         const userPrompt = this.buildUserPrompt(snippets);
+        
+        // Combine system and user prompts for Gemini
+        const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
 
         try {
-            const response = await this.openai.chat.completions.create({
-                model: 'gpt-4o-mini',
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
-                temperature: 0.7,
-                max_tokens: 2000,
-                response_format: { type: 'json_object' }
+            const result = await this.model.generateContent({
+                contents: [{
+                    parts: [{
+                        text: fullPrompt
+                    }]
+                }],
+                generationConfig: {
+                    temperature: 0.7,
+                    maxOutputTokens: 2000
+                }
             });
 
-            const content = response.choices[0].message.content;
+            const response = await result.response;
+            const content = response.text();
+            
             if (!content) throw new Error('No response from AI');
 
-            const result = JSON.parse(content);
-            return result.bullets || [];
+            // More aggressive cleaning for Gemini responses
+            let cleanContent = content.trim();
+            
+            // Remove markdown code blocks
+            if (cleanContent.startsWith('```json')) {
+                cleanContent = cleanContent.replace(/```json\n?/, '').replace(/\n?```$/, '');
+            } else if (cleanContent.startsWith('```')) {
+                cleanContent = cleanContent.replace(/```\n?/, '').replace(/\n?```$/, '');
+            }
+            
+            // Find JSON object in the response
+            const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                cleanContent = jsonMatch[0];
+            } else {
+                // If no JSON found, create a fallback response
+                console.warn('No JSON found in response:', cleanContent);
+                return [{
+                    content: "Unable to parse AI response - please check your code contributions",
+                    confidence: 0.1,
+                    tags: ["error"]
+                }];
+            }
+
+            const parsedResult = JSON.parse(cleanContent);
+            return parsedResult.bullets || [];
 
         } catch (error: any) {
             throw new Error(`AI generation failed: ${error.message}`);
@@ -48,6 +82,8 @@ export class ResumeGenerator {
     private buildSystemPrompt(style: string): string {
         const basePrompt = `You are an expert technical resume writer. Analyze code contributions and generate impactful resume bullet points.
 
+CRITICAL: You must respond with ONLY valid JSON. Do not include any explanation, comments, or markdown formatting.
+
 Requirements:
 - Start with strong action verbs (Developed, Implemented, Optimized, etc.)
 - Include specific technologies and technical details
@@ -55,7 +91,7 @@ Requirements:
 - Focus on business value and outcomes
 - Be concise but specific
 
-Return JSON format:
+Response format (JSON only):
 {
   "bullets": [
     {
@@ -73,7 +109,7 @@ Return JSON format:
             academic: '\n\nFocus on algorithms, research aspects, and theoretical contributions.'
         };
 
-        return basePrompt + (styleGuides[style] || styleGuides.professional);
+        return basePrompt + (styleGuides[style] || styleGuides.professional) + '\n\nRemember: Respond with ONLY the JSON object, no other text.';
     }
 
     private buildUserPrompt(snippets: CodeSnippet[]): string {
