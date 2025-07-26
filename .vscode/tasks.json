@@ -13,12 +13,6 @@
                 "kind": "build",
                 "isDefault": true
             }
-        },
-        {
-            "type": "npm",
-            "script": "compile",
-            "group": "build",
-            "problemMatcher": "$tsc"
         }
     ]
 }
